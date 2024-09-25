@@ -4,7 +4,7 @@ require('dotenv').config()
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const jwt = require('jsonwebtoken')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 5000
 
@@ -83,11 +83,27 @@ async function run() {
     })
 
     // 1.get all rooms for bd..
-    
     app.get('/rooms',async(req,res)=>{
-      const result=await roomsCollection.find().toArray()
+      const result= await roomsCollection.find().toArray()
       res.send(result)
     })
+
+
+  // 2.Get a single room data from db using _id
+//  app.get('room/:id',async(req,res)=>{
+//   const id=req.params.id;
+//   const query={_id: new ObjectId(id)}
+//   const result = await roomsCollection.findOne(query)
+//   res.send(result)
+//  })
+
+app.get('/room/:id',async(req,res)=>{
+  const id=req.params.id;
+  // const query={_id : new ObjectId(id)}
+
+  const result= await roomsCollection.findOne({_id : new ObjectId(id)})
+  res.send(result)
+})
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
