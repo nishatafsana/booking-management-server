@@ -83,27 +83,89 @@ async function run() {
     })
 
     // 1.get all rooms for bd..
-    app.get('/rooms',async(req,res)=>{
-      const result= await roomsCollection.find().toArray()
+    app.get('/rooms', async (req, res) => {
+      const category = req.query.category
+      console.log(category)
+      let query = {}
+      if (category && category !== 'null') query = { category }
+      const result = await roomsCollection.find(query).toArray()
+      res.send(result)
+    })
+
+  // 2.Get a single room data from db using _id
+app.get('/room/:id',async(req,res)=>{
+  const id=req.params.id;
+  // const query={_id : new ObjectId(id)}
+  const result= await roomsCollection.findOne({_id : new ObjectId(id)})
+  res.send(result)
+})
+// 3.save a room for db 
+app.post('/room',async(req,res)=>{
+  const roomData= req.body;
+  const result= await roomsCollection.insertOne(roomData)
+  res.send(result)
+})
+
+
+// 4.get all rooms for host 
+app.get('/my-listings/:email', async (req, res) => {
+  const email = req.params.email
+
+  let query = { 'host.email': email }
+  const result = await roomsCollection.find(query).toArray()
+  res.send(result)
+})
+    // 5.delete a room
+    app.delete('/room/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await roomsCollection.deleteOne(query)
       res.send(result)
     })
 
 
-  // 2.Get a single room data from db using _id
-//  app.get('room/:id',async(req,res)=>{
-//   const id=req.params.id;
-//   const query={_id: new ObjectId(id)}
-//   const result = await roomsCollection.findOne(query)
-//   res.send(result)
-//  })
 
-app.get('/room/:id',async(req,res)=>{
-  const id=req.params.id;
-  // const query={_id : new ObjectId(id)}
-
-  const result= await roomsCollection.findOne({_id : new ObjectId(id)})
+// 6.save a user data in db
+ // save a user data in db
+ app.put('/user', async (req, res) => {
+  const user = req.body
+  const query = { email: user?.email }
+  // check if user already exists in db
+  const isExist = await usersCollection.findOne(query)
+  if (isExist) {
+    if (user.status === 'Requested') {
+      // if existing user try to change his role
+      const result = await usersCollection.updateOne(query, {
+        $set: { status: user?.status },
+      })
+      return res.send(result)
+    } else {
+      // if existing user login again
+      return res.send(isExist)
+    }
+  }
+  // save user for the first time
+  const options = { upsert: true }
+  const updateDoc = {
+    $set: {
+      ...user,
+      timestamp: Date.now(),
+    },
+  }
+  const result = await usersCollection.updateOne(query, updateDoc, options)
   res.send(result)
 })
+
+
+
+
+      // 7.get all users data from db
+      app.get('/users', async (req, res) => {
+        const result = await usersCollection.find().toArray()
+        res.send(result)
+      })
+
+
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
