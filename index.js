@@ -4,6 +4,7 @@ require('dotenv').config()
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const jwt = require('jsonwebtoken')
+const nodemailer = require("nodemailer");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000
@@ -18,6 +19,45 @@ app.use(cors(corsOptions))
 
 app.use(express.json())
 app.use(cookieParser())
+
+// send email
+const sendEmail = (emailAddress, emailData) => {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use `true` for port 465, `false` for all other ports
+    auth: {
+      user: process.env.TRANSPORTER_EMAIL,
+      pass: process.env.TRANSPORTER_PASS,
+    },
+  })
+
+  // verify transporter
+  // verify connection configuration
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.log(error)
+    } else {
+      console.log('Server is ready to take our messages')
+    }
+  })
+  const mailBody = {
+    from: `"resort-management" <${process.env.TRANSPORTER_EMAIL}>`, // sender address
+    to: emailAddress, // list of receivers
+    subject: emailData.subject, // Subject line
+    html: emailData.message, // html body
+  }
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error)
+    } else {
+      console.log('Email Sent: ' + info.response)
+    }
+  })
+}
+
 
 // Verify Token Middleware
 const verifyToken = async (req, res, next) => {
@@ -181,6 +221,11 @@ app.get('/my-listings/:email',verifyToken,verifyHost, async (req, res) => {
     },
   }
   const result = await usersCollection.updateOne(query, updateDoc, options)
+    // welcome new user
+    sendEmail(user?.email, {
+      subject: 'Welcome to resort management!',
+      message: `Hope you will find you destination`,
+    })
   res.send(result)
 })
 
@@ -233,8 +278,16 @@ app.get('/my-listings/:email',verifyToken,verifyHost, async (req, res) => {
   app.post('/booking',verifyToken,async(req,res)=>{
     const bookingData = req.body
     const result = await bookingsCollection.insertOne(bookingData)
- 
-    res.send(result)
+      // send email to guest
+      sendEmail(bookingData?.guest?.email, {
+        subject: 'Booking Successful!',
+        message: `You've successfully booked a room through resort-management. Transaction Id: ${bookingData.transactionId}`,
+      })
+  // send email to host
+  sendEmail(bookingData?.host?.email, {
+    subject: 'Your room got booked!',
+    message: `Get ready to welcome ${bookingData.guest.name}.`,
+  })
 
   })
   
@@ -268,7 +321,18 @@ const result=await bookingsCollection.find(query).toArray()
 res.send(result)
 })
 
-
+// /last a korci update korvo..
+    // update room data
+    app.put('/room/update/:id', verifyToken, verifyHost, async (req, res) => {
+      const id = req.params.id
+      const roomData = req.body
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: roomData,
+      }
+      const result = await roomsCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
 
  // Admin Statistics
  app.get('/admin-stat', verifyToken, verifyAdmin, async (req, res) => {
@@ -304,7 +368,7 @@ res.send(result)
     return data
   })
   chartData.unshift(['Day', 'Sales'])
-  // chartData.splice(0, 0, ['Day', 'Sales'])
+
 
   console.log(chartData)
 
